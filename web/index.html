@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Robbie Voice Agent Demo</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="card">
+        <h1>Robbie Voice Agent</h1>
+        <p class="subtitle">Connect and speak with the agent in a LiveKit room.</p>
+        <form id="connect-form">
+          <label>
+            Your name
+            <input id="name" type="text" autocomplete="name" placeholder="Jane" required />
+          </label>
+          <label>
+            Passcode
+            <input id="passcode" type="password" placeholder="Shared passcode" required />
+          </label>
+          <div class="actions">
+            <button id="connect" type="submit">Connect</button>
+            <button id="disconnect" type="button" disabled>Disconnect</button>
+          </div>
+        </form>
+        <div class="status" id="status">Idle.</div>
+        <div class="meta">
+          <div><span>Room:</span> <strong id="room">-</strong></div>
+          <div><span>Participant:</span> <strong id="participant">-</strong></div>
+        </div>
+      </section>
+      <section class="card log">
+        <h2>Session Log</h2>
+        <div id="log"></div>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/livekit-client/dist/livekit-client.umd.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
