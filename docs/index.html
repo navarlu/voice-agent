@@ -4,6 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Robbie Voice Agent Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -30,6 +34,26 @@
           <div><span>Room:</span> <strong id="room">-</strong></div>
           <div><span>Participant:</span> <strong id="participant">-</strong></div>
         </div>
+      </section>
+      <section class="card chat">
+        <div class="chat-header">
+          <div>
+            <h2>Live Chat & Transcripts</h2>
+            <p class="subtitle">See speech in realtime and type messages to the agent.</p>
+          </div>
+          <div class="pill">lk.transcription</div>
+        </div>
+        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form">
+          <input
+            id="chat-input"
+            type="text"
+            autocomplete="off"
+            placeholder="Type your message to Pepper..."
+            disabled
+          />
+          <button id="chat-send" type="submit" disabled>Send</button>
+        </form>
       </section>
       <section class="card log">
         <h2>Session Log</h2>
