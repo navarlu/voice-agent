@@ -1,4 +1,48 @@
-const TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
+const PROD_TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
+const LOCAL_TOKEN_ENDPOINT = "http://localhost:8001/token";
+const ENV_STORAGE_KEY = "lk-env";
+
+function resolveEnvironment() {
+  const params = new URLSearchParams(window.location.search);
+  const paramEnv = params.get("env");
+  if (paramEnv) {
+    localStorage.setItem(ENV_STORAGE_KEY, paramEnv);
+  }
+
+  const storedEnv = localStorage.getItem(ENV_STORAGE_KEY);
+  const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const env = paramEnv || storedEnv || (isLocalHost ? "local" : "prod");
+
+  return env === "local" ? "local" : "prod";
+}
+
+let activeEnv = resolveEnvironment();
+const envToggle = document.getElementById("env-toggle");
+const envLabel = document.getElementById("env-label");
+
+function getTokenEndpoint() {
+  return activeEnv === "local" ? LOCAL_TOKEN_ENDPOINT : PROD_TOKEN_ENDPOINT;
+}
+
+function updateEnvUI() {
+  if (envLabel) {
+    envLabel.textContent = activeEnv;
+  }
+}
+
+function persistEnv(env) {
+  localStorage.setItem(ENV_STORAGE_KEY, env);
+}
+
+updateEnvUI();
+
+if (envToggle) {
+  envToggle.addEventListener("click", () => {
+    activeEnv = activeEnv === "local" ? "prod" : "local";
+    persistEnv(activeEnv);
+    updateEnvUI();
+  });
+}
 
 const form = document.getElementById("connect-form");
 const connectBtn = document.getElementById("connect");
@@ -11,10 +55,13 @@ const chatMessagesEl = document.getElementById("chat-messages");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const chatSend = document.getElementById("chat-send");
+const bodyEl = document.body;
+const voiceOrb = document.getElementById("voice-orb");
 
 let room;
 let localIdentity = null;
 const transcriptEntries = new Map();
+const speakingTimeouts = new Map();
 
 const CHAT_TOPIC = "lk.chat";
 const TRANSCRIPTION_TOPIC = "lk.transcription";
@@ -46,6 +93,9 @@ function scrollChatToBottom() {
 function createMessageElement({ senderLabel, text, kind, isInterim }) {
   const messageEl = document.createElement("div");
   messageEl.className = `message message--${kind}`;
+  if (kind.startsWith("you")) {
+    messageEl.classList.add("message--me");
+  }
   if (isInterim) {
     messageEl.classList.add("is-interim");
   }
@@ -93,7 +143,7 @@ function upsertTranscriptMessage({ key, senderLabel, kind, text, isFinal }) {
 }
 
 function addSystemMessage(text) {
-  createMessageElement({ senderLabel: "System", text, kind: "system", isInterim: false });
+  createMessageElement({ senderLabel: "System:", text, kind: "system", isInterim: false });
 }
 
 function resetChat() {
@@ -101,8 +151,44 @@ function resetChat() {
   chatMessagesEl.innerHTML = "";
 }
 
+function setSpeaking(kind, isActive) {
+  const className = `speaking-${kind}`;
+  if (!bodyEl) {
+    return;
+  }
+
+  if (isActive) {
+    bodyEl.classList.add(className);
+    if (voiceOrb) {
+      voiceOrb.setAttribute("data-speaking", kind);
+    }
+    const existingTimeout = speakingTimeouts.get(kind);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+    const timeoutId = setTimeout(() => {
+      bodyEl.classList.remove(className);
+      if (voiceOrb && voiceOrb.getAttribute("data-speaking") === kind) {
+        voiceOrb.removeAttribute("data-speaking");
+      }
+      speakingTimeouts.delete(kind);
+    }, 1200);
+    speakingTimeouts.set(kind, timeoutId);
+  } else {
+    const existingTimeout = speakingTimeouts.get(kind);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      speakingTimeouts.delete(kind);
+    }
+    bodyEl.classList.remove(className);
+    if (voiceOrb && voiceOrb.getAttribute("data-speaking") === kind) {
+      voiceOrb.removeAttribute("data-speaking");
+    }
+  }
+}
+
 async function fetchToken(name, passcode) {
-  const response = await fetch(TOKEN_ENDPOINT, {
+  const response = await fetch(getTokenEndpoint(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, passcode }),
@@ -118,6 +204,8 @@ async function fetchToken(name, passcode) {
 
 async function connect(name, passcode) {
   setStatus("Requesting token...");
+  const tokenEndpoint = getTokenEndpoint();
+  log(`Environment: ${activeEnv} (${tokenEndpoint})`);
   const { token, room: roomName, url } = await fetchToken(name, passcode);
 
   setStatus("Connecting to room...");
@@ -159,7 +247,7 @@ async function connect(name, passcode) {
 
   roomEl.textContent = roomName;
   participantEl.textContent = name;
-  localIdentity = name;
+  localIdentity = room.localParticipant?.identity || name;
   setButtons(true);
   setChatEnabled(true);
   setStatus("Connected. Speak to the agent!");
@@ -171,22 +259,32 @@ async function connect(name, passcode) {
     const isFinal = attributes["lk.transcription_final"] === "true";
     const segmentId = attributes["lk.segment_id"];
     const transcribedTrackId = attributes["lk.transcribed_track_id"];
-    const senderIdentity = participantInfo?.identity || "unknown";
+    const senderIdentity =
+      participantInfo?.identity || reader.info?.participantIdentity || "unknown";
 
     if (!transcribedTrackId) {
       return;
     }
 
-    const senderLabel = senderIdentity === localIdentity ? "You (speech)" : "Agent";
-    const kind = senderIdentity === localIdentity ? "you-speech" : "agent";
+    const localId = room?.localParticipant?.identity || localIdentity;
+    const isLocalSpeaker = localId && senderIdentity === localId;
+    const kind = isLocalSpeaker ? "user" : "agent";
+    const senderLabel = isLocalSpeaker ? "Me:" : "Agent:";
+    const messageKind = isLocalSpeaker ? "you-speech" : "agent";
     const key = segmentId ? `${senderIdentity}:${segmentId}` : null;
     upsertTranscriptMessage({
       key,
       senderLabel,
-      kind,
+      kind: messageKind,
       text: message,
       isFinal,
     });
+
+    if (!isFinal) {
+      setSpeaking(kind, true);
+    } else {
+      setSpeaking(kind, false);
+    }
   });
 
   addSystemMessage("Transcription stream ready. Start speaking or type below.");
@@ -237,7 +335,7 @@ chatForm.addEventListener("submit", async (event) => {
   }
 
   chatInput.value = "";
-  createMessageElement({ senderLabel: "You (typed)", text: message, kind: "you-typed" });
+  createMessageElement({ senderLabel: "Me:", text: message, kind: "you-typed" });
 
   try {
     await room.localParticipant.sendText(message, { topic: CHAT_TOPIC });

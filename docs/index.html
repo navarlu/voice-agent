@@ -6,16 +6,19 @@
     <title>Robbie Voice Agent Demo</title>
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
     />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="page">
-      <section class="card">
-        <h1>Robbie Voice Agent</h1>
-        <p class="subtitle">Connect and speak with the agent in a LiveKit room.</p>
-        <form id="connect-form">
+    <main class="layout">
+      <section class="panel connect">
+        <div class="panel-header">
+          <p class="eyebrow">LiveKit Session</p>
+          <h1>Robbie Voice Agent</h1>
+          <p class="subtitle">Connect and speak with the agent in a LiveKit room.</p>
+        </div>
+        <form id="connect-form" class="connect-form">
           <label>
             Your name
             <input id="name" type="text" autocomplete="name" placeholder="Jane" required />
@@ -29,34 +32,67 @@
             <button id="disconnect" type="button" disabled>Disconnect</button>
           </div>
         </form>
-        <div class="status" id="status">Idle.</div>
-        <div class="meta">
-          <div><span>Room:</span> <strong id="room">-</strong></div>
-          <div><span>Participant:</span> <strong id="participant">-</strong></div>
+        <div class="env-toggle">
+          <span>Environment</span>
+          <button id="env-toggle" type="button">
+            <span id="env-label">prod</span>
+          </button>
         </div>
       </section>
-      <section class="card chat">
-        <div class="chat-header">
+
+      <section class="panel stage">
+        <div class="stage-header">
           <div>
-            <h2>Live Chat & Transcripts</h2>
-            <p class="subtitle">See speech in realtime and type messages to the agent.</p>
+            <h2>Live Presence</h2>
+            <p class="subtitle">A responsive visualizer that reacts to speech.</p>
           </div>
           <div class="pill">lk.transcription</div>
         </div>
-        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
-        <form id="chat-form" class="chat-form">
-          <input
-            id="chat-input"
-            type="text"
-            autocomplete="off"
-            placeholder="Type your message to Pepper..."
-            disabled
-          />
-          <button id="chat-send" type="submit" disabled>Send</button>
-        </form>
+
+        <div class="voice-stage">
+          <div class="voice-orb" id="voice-orb" aria-hidden="true">
+            <div class="orb-core"></div>
+            <div class="orb-ring"></div>
+            <div class="orb-glow"></div>
+          </div>
+          <div class="voice-meta">
+            <div class="status">
+              <span class="status-label">Status</span>
+              <span id="status" class="status-text">Idle.</span>
+            </div>
+            <div class="meta">
+              <div><span>Room</span> <strong id="room">-</strong></div>
+              <div><span>Participant</span> <strong id="participant">-</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <section class="chat">
+          <div class="chat-header">
+            <div>
+              <h3>Chat & Transcripts</h3>
+              <p class="subtitle">Type messages and see live transcriptions.</p>
+            </div>
+          </div>
+          <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+          <form id="chat-form" class="chat-form">
+            <input
+              id="chat-input"
+              type="text"
+              autocomplete="off"
+              placeholder="Say hi to the agent..."
+              disabled
+            />
+            <button id="chat-send" type="submit" disabled>Send</button>
+          </form>
+        </section>
       </section>
-      <section class="card log">
-        <h2>Session Log</h2>
+
+      <section class="panel log">
+        <div class="panel-header">
+          <h2>Session Log</h2>
+          <p class="subtitle">Debug notes as the room updates.</p>
+        </div>
         <div id="log"></div>
       </section>
     </main>

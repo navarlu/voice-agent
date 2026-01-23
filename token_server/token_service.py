@@ -50,7 +50,7 @@ if ALLOWED_ORIGINS:
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
         allow_credentials=False,
-        allow_methods=["POST"],
+        allow_methods=["POST", "OPTIONS"],
         allow_headers=["*"],
     )
 

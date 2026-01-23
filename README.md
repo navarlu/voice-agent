@@ -4,13 +4,32 @@ Static GitHub Pages UI + FastAPI token server for a LiveKit voice agent. The age
 
 ## Architecture
 
-- `web/` → GitHub Pages static UI (WebRTC via LiveKit JS)
+- `docs/` → GitHub Pages static UI (WebRTC via LiveKit JS)
 - `token_server/` → FastAPI service that mints LiveKit tokens
 - `agent/` → LiveKit agent process (LLM/STT/TTS)
 - LiveKit server → public URL with TLS (HTTPS/WSS)
 - RPi agent connects to LiveKit over Tailscale
 
 ## Setup
+
+### 0) Local LiveKit (Docker)
+
+For local dev, spin up LiveKit + Redis:
+
+```
+docker compose -f local/docker-compose.yml up -d
+```
+
+Update your `.env` for local:
+
+```
+LIVEKIT_URL=ws://localhost:7880
+LIVEKIT_API_KEY=LK_LOCAL_KEY
+LIVEKIT_API_SECRET=LK_LOCAL_SECRET
+ALLOWED_ORIGINS=http://localhost:5500
+```
+
+`local/livekit.yaml` contains the matching key/secret. Change both if you prefer your own values.
 
 ### 1) LiveKit URL + TLS
 
@@ -47,7 +66,7 @@ uv pip install -r requirements.txt
 ### 4) Run token server
 
 ```
-uv run uvicorn token_server.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn token_server.token_service:app --host 0.0.0.0 --port 8001
 ```
 
 If your reverse proxy routes `/api/` to this server, map `/api/token` → `/token`.
@@ -64,13 +83,22 @@ The agent will join LiveKit and greet the first participant.
 
 ### 6) GitHub Pages UI
 
-Update `web/app.js`:
+Update `docs/app.js`:
 
 ```
 const TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
 ```
 
-Publish the `web/` folder with GitHub Pages.
+Publish the `docs/` folder with GitHub Pages.
+
+### Local UI toggle
+
+The UI now auto-switches to local endpoints on `localhost`. You can also force it:
+
+- `?env=local` → uses `http://localhost:8001/token`
+- `?env=prod` → uses production URL
+
+The selection is persisted in localStorage.
 
 ## Notes
 
