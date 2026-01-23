@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from livekit.api import AccessToken, VideoGrants
 
 
-load_dotenv()
+# Always load env from repo root so running from token_server/ still works
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "").strip()
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "").strip()
@@ -21,6 +22,14 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 ROOM_PREFIX = os.getenv("ROOM_PREFIX", "robbie")
+
+
+def _mask(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 4:
+        return "*" * len(value)
+    return f"{value[:2]}***{value[-2:]}"
 
 
 class TokenRequest(BaseModel):
@@ -42,8 +51,20 @@ if ALLOWED_ORIGINS:
         allow_origins=ALLOWED_ORIGINS,
         allow_credentials=False,
         allow_methods=["POST"],
-        allow_headers=["*"]
+        allow_headers=["*"],
     )
+
+print(
+    "[token_service] config",
+    {
+        "LIVEKIT_URL": LIVEKIT_URL,
+        "LIVEKIT_API_KEY": _mask(LIVEKIT_API_KEY),
+        "LIVEKIT_API_SECRET": _mask(LIVEKIT_API_SECRET),
+        "DEMO_PASSCODE_SET": bool(DEMO_PASSCODE),
+        "ALLOWED_ORIGINS": ALLOWED_ORIGINS,
+        "ROOM_PREFIX": ROOM_PREFIX,
+    },
+)
 
 
 def _require_env():
@@ -62,19 +83,28 @@ def mint_token(payload: TokenRequest) -> TokenResponse:
     room_name = f"{ROOM_PREFIX}-{uuid.uuid4().hex[:8]}"
     identity = f"web-{uuid.uuid4().hex}"
 
-    token = AccessToken(
-        api_key=LIVEKIT_API_KEY,
-        api_secret=LIVEKIT_API_SECRET,
-        identity=identity,
-        name=payload.name.strip() or "Guest",
-    )
-    token.add_grant(
-        VideoGrants(
-            room=room_name,
-            room_join=True,
-            can_publish=True,
-            can_subscribe=True,
+    try:
+        token = (
+            AccessToken(api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET)
+            .with_identity(identity)
+            .with_name(payload.name.strip() or "Guest")
+            .with_grants(
+                VideoGrants(
+                    room=room_name,
+                    room_join=True,
+                    can_publish=True,
+                    can_subscribe=True,
+                )
+            )
         )
+        jwt = token.to_jwt()
+    except Exception as exc:
+        print("[token_service] token generation failed:", repr(exc))
+        raise
+
+    print(
+        "[token_service] issued token",
+        {"room": room_name, "identity": identity, "name": payload.name.strip()},
     )
 
-    return TokenResponse(token=token.to_jwt(), room=room_name, url=LIVEKIT_URL)
+    return TokenResponse(token=jwt, room=room_name, url=LIVEKIT_URL)

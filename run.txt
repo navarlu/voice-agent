@@ -1,0 +1,5 @@
+Start token server:
+uv run uvicorn token_server.main:app --host 0.0.0.0 --port 8000
+
+Start agent:
+uv run python agent/voice_agent.py dev
