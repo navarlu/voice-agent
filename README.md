@@ -17,7 +17,9 @@ Static GitHub Pages UI + FastAPI token server for a LiveKit voice agent. The age
 For local dev, spin up LiveKit + Redis:
 
 ```
-docker compose -f local/docker-compose.yml up -d
+docker compose \
+  --env-file .env \
+  -f local/docker-compose.yml up -d
 ```
 
 Update your `.env` for local:
