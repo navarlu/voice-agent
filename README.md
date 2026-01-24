@@ -1,26 +1,26 @@
-# Robbie Voice Agent Demo
+# Voice Agent Demo
 
-Showcase of a LiveKit voice agent with a function tool that searches a vector database (RAG). Users can try it on GitHub Pages after entering the passcode at:
-
-```
-https://navarlu.github.io/voice-agent/
-```
-
-Static GitHub Pages UI + FastAPI token server for a LiveKit voice agent. The agent code now lives separately from the token server so you can run/deploy them independently.
+Showcase of a LiveKit voice agent with a function tool that searches a vector database (RAG). This guide covers running everything locally.
 
 ## Architecture
 
-- `docs/` → GitHub Pages static UI (WebRTC via LiveKit JS)
+- `docs/` → Local static UI (WebRTC via LiveKit JS)
 - `token_server/` → FastAPI service that mints LiveKit tokens
 - `agent/` → LiveKit agent process (LLM/STT/TTS)
-- LiveKit server → public URL with TLS (HTTPS/WSS)
-- RPi agent connects to LiveKit over Tailscale
+- LiveKit server → local Docker services (LiveKit + Redis + Weaviate)
 
 ## Setup
 
-### 0) Local LiveKit (Docker)
+### 0) Clone the repo
 
-For local dev, spin up LiveKit + Redis:
+```
+git clone https://github.com/navarlu/voice-agent.git
+cd voice-agent
+```
+
+### 1) Local LiveKit and Weaviate (Docker)
+
+For local dev, spin up LiveKit + Redis + Weaviate:
 
 ```
 docker compose \
@@ -39,24 +39,16 @@ ALLOWED_ORIGINS=http://localhost:5500
 
 `local/livekit.yaml` contains the matching key/secret. Change both if you prefer your own values.
 
-### 1) LiveKit URL + TLS
-
-Browsers require HTTPS/WSS for mic access. Point a subdomain like `livekit.virtualemployees.solutions` to your VM and terminate TLS (Caddy/NGINX). The web client uses:
-
-```
-wss://livekit.virtualemployees.solutions
-```
-
 ### 2) Shared env file
 
 Create a single `.env` in the repo root (next to this README). Both the token server and the agent read from it:
 
 ```
-LIVEKIT_URL=wss://livekit.virtualemployees.solutions
-LIVEKIT_API_KEY=...
-LIVEKIT_API_SECRET=...
+LIVEKIT_URL=ws://localhost:7880
+LIVEKIT_API_KEY=LK_LOCAL_KEY
+LIVEKIT_API_SECRET=LK_LOCAL_SECRET
 DEMO_PASSCODE=...
-ALLOWED_ORIGINS=https://<your-github-pages-domain>
+ALLOWED_ORIGINS=http://localhost:5500
 ROOM_PREFIX=robbie
 OPENAI_API_KEY=...
 ```
@@ -88,17 +80,7 @@ uv run python agent/voice_agent.py
 
 The agent will join LiveKit and greet the first participant.
 
-### 6) GitHub Pages UI
-
-Update `docs/app.js`:
-
-```
-const TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
-```
-
-Publish the `docs/` folder with GitHub Pages.
-
-### 7) Run local static UI server
+### 6) Run local static UI server
 
 Serve the static UI locally:
 
@@ -108,10 +90,6 @@ uv run python -m http.server 5500 --directory docs
 
 ### Local UI toggle
 
-The UI now auto-switches to local endpoints on `localhost`. You can also force it:
+The UI auto-switches to local endpoints on `localhost`. You can also force it:
 
 - `?env=local` → uses `http://localhost:8001/token`
-- `?env=prod` → uses production URL
-
-The selection is persisted in localStorage.
-
