@@ -4,3 +4,7 @@ AGENTS.md
 __pycache__/
 *.pyc
 UI_guide.md
+
+local/weaviate_data/
+local/session_transcripts.json
+local/uploads/

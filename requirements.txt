@@ -5,3 +5,7 @@ livekit-api==1.0.7
 livekit-agents
 livekit-plugins-openai
 livekit-plugins-silero
+weaviate-client==4.19.2
+pymupdf==1.26.7
+langchain-text-splitters==1.1.0
+python-multipart==0.0.21

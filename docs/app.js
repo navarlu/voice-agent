@@ -1,46 +1,30 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import htm from "htm";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  ConnectionStateToast,
+  StartAudio,
+  TrackToggle,
+  useConnectionState,
+  useLocalParticipant,
+  useRoomContext,
+  useTracks,
+  useVoiceAssistant,
+  useTranscriptions,
+  VideoTrack,
+  BarVisualizer,
+} from "@livekit/components-react";
+import { Track, RoomEvent } from "livekit-client";
+
+const html = htm.bind(React.createElement);
+
 const PROD_TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
 const LOCAL_TOKEN_ENDPOINT = "http://localhost:8001/token";
 const ENV_STORAGE_KEY = "lk-env";
 
 const CHAT_TOPIC = "lk.chat";
-const TRANSCRIPTION_TOPIC = "lk.transcription";
-
-const envToggle = document.getElementById("env-toggle");
-const envLabel = document.getElementById("env-label");
-const nameInput = document.getElementById("name");
-const passcodeInput = document.getElementById("passcode");
-const roomEl = document.getElementById("room");
-const participantEl = document.getElementById("participant");
-const statusEl = document.getElementById("status");
-const connectionState = document.getElementById("connection-state");
-const stateLabel = document.getElementById("state-label");
-const chatMessagesEl = document.getElementById("chat-messages");
-const chatEmptyEl = document.getElementById("chat-empty");
-const chatInput = document.getElementById("chat-input");
-const chatSend = document.getElementById("chat-send");
-const micToggle = document.getElementById("mic-toggle");
-const keyboardToggle = document.getElementById("keyboard-toggle");
-const textInput = document.getElementById("text-input");
-const callToggle = document.getElementById("call-toggle");
-const callLabel = document.getElementById("call-label");
-const waveformCanvas = document.getElementById("waveform");
-const voiceOrb = document.getElementById("voice-orb");
-
-let activeEnv = resolveEnvironment();
-let room = null;
-let localIdentity = null;
-let localAudioTrack = null;
-let isMuted = false;
-let isKeyboardOpen = false;
-
-let audioContext = null;
-let analyser = null;
-let analyserData = null;
-let waveformAnimationId = null;
-let waveformWidth = 0;
-let waveformHeight = 0;
-
-const transcriptEntries = new Map();
 
 function resolveEnvironment() {
   const params = new URLSearchParams(window.location.search);
@@ -56,137 +40,16 @@ function resolveEnvironment() {
   return env === "local" ? "local" : "prod";
 }
 
-function getTokenEndpoint() {
+function getTokenEndpoint(activeEnv) {
   return activeEnv === "local" ? LOCAL_TOKEN_ENDPOINT : PROD_TOKEN_ENDPOINT;
 }
 
-function updateEnvUI() {
-  if (envLabel) {
-    envLabel.textContent = activeEnv;
-  }
+function getApiBase(activeEnv) {
+  return getTokenEndpoint(activeEnv).replace(/\/token$/, "");
 }
 
-function setStatus(message) {
-  statusEl.textContent = message;
-}
-
-function setConnectionState(state, label) {
-  connectionState.classList.remove("connecting", "connected", "error");
-  if (state) {
-    connectionState.classList.add(state);
-  }
-  stateLabel.textContent = label;
-}
-
-function setCallButtonState(state) {
-  callToggle.classList.remove("connected", "disconnecting");
-  if (state === "connected") {
-    callToggle.classList.add("connected");
-    callLabel.textContent = "Hang up";
-  } else if (state === "disconnecting") {
-    callToggle.classList.add("disconnecting");
-    callLabel.textContent = "Ending";
-  } else if (state === "connecting") {
-    callLabel.textContent = "Calling";
-  } else {
-    callLabel.textContent = "Call";
-  }
-}
-
-function setTextInputEnabled(enabled) {
-  chatInput.disabled = !enabled;
-  chatSend.disabled = !enabled;
-  micToggle.disabled = !enabled;
-  keyboardToggle.disabled = !enabled;
-  if (!enabled) {
-    isKeyboardOpen = false;
-    keyboardToggle.setAttribute("aria-pressed", "false");
-    textInput.classList.remove("active");
-  }
-}
-
-function scrollChatToBottom() {
-  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-}
-
-function updateEmptyState() {
-  const hasMessages = chatMessagesEl.children.length > 0;
-  chatEmptyEl.style.display = hasMessages ? "none" : "grid";
-}
-
-function createMessageElement({ senderLabel, text, kind, isInterim }) {
-  const messageEl = document.createElement("div");
-  messageEl.className = `message message--${kind}`;
-  if (isInterim) {
-    messageEl.classList.add("is-interim");
-  }
-
-  const metaEl = document.createElement("div");
-  metaEl.className = "message-meta";
-  metaEl.textContent = senderLabel;
-
-  const textEl = document.createElement("div");
-  textEl.className = "message-text";
-  textEl.textContent = text;
-
-  messageEl.append(metaEl, textEl);
-  chatMessagesEl.appendChild(messageEl);
-  updateEmptyState();
-  scrollChatToBottom();
-  return messageEl;
-}
-
-function upsertTranscriptMessage({ key, senderLabel, kind, text, isFinal }) {
-  if (!key) {
-    createMessageElement({ senderLabel, text, kind, isInterim: !isFinal });
-    return;
-  }
-
-  let messageEl = transcriptEntries.get(key);
-  if (!messageEl) {
-    messageEl = createMessageElement({
-      senderLabel,
-      text,
-      kind,
-      isInterim: !isFinal,
-    });
-    transcriptEntries.set(key, messageEl);
-  } else {
-    const textEl = messageEl.querySelector(".message-text");
-    if (textEl) {
-      textEl.textContent = text;
-    }
-    messageEl.classList.toggle("is-interim", !isFinal);
-  }
-
-  if (isFinal) {
-    transcriptEntries.delete(key);
-  }
-}
-
-function addSystemMessage(text) {
-  createMessageElement({ senderLabel: "System", text, kind: "system", isInterim: false });
-}
-
-function clearConversation() {
-  transcriptEntries.clear();
-  chatMessagesEl.innerHTML = "";
-  updateEmptyState();
-}
-
-function ensureCredentials() {
-  const name = nameInput.value.trim();
-  const passcode = passcodeInput.value.trim();
-  if (!name || !passcode) {
-    setStatus("Add name and passcode to start.");
-    setConnectionState("error", "Missing details");
-    return null;
-  }
-  return { name, passcode };
-}
-
-async function fetchToken(name, passcode) {
-  const response = await fetch(getTokenEndpoint(), {
+async function fetchToken(activeEnv, name, passcode) {
+  const response = await fetch(getTokenEndpoint(activeEnv), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, passcode }),
@@ -200,336 +63,584 @@ async function fetchToken(name, passcode) {
   return response.json();
 }
 
-function prepareWaveform(stream) {
-  stopWaveform();
-  if (!stream) {
-    return;
+async function uploadDocument(activeEnv, name, passcode, file) {
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("file", file);
+  if (passcode) {
+    formData.append("passcode", passcode);
   }
 
-  audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(stream);
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 2048;
-  analyserData = new Uint8Array(analyser.fftSize);
-  source.connect(analyser);
+  const response = await fetch(`${getApiBase(activeEnv)}/documents/upload`, {
+    method: "POST",
+    body: formData,
+  });
 
-  resizeWaveform();
-  drawWaveform();
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Failed to upload document");
+  }
+
+  return response.json();
 }
 
-function resizeWaveform() {
-  if (!waveformCanvas) {
-    return;
+async function deleteDocument(activeEnv, name, passcode, source) {
+  const response = await fetch(`${getApiBase(activeEnv)}/documents/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, passcode, source }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Failed to delete document");
   }
-  const dpr = window.devicePixelRatio || 1;
-  waveformWidth = waveformCanvas.clientWidth * dpr;
-  waveformHeight = waveformCanvas.clientHeight * dpr;
-  waveformCanvas.width = waveformWidth;
-  waveformCanvas.height = waveformHeight;
+
+  return response.json();
 }
 
-function stopWaveform() {
-  if (waveformAnimationId) {
-    cancelAnimationFrame(waveformAnimationId);
-    waveformAnimationId = null;
+async function listDocuments(activeEnv, name, passcode) {
+  const response = await fetch(`${getApiBase(activeEnv)}/documents/list`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, passcode }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Failed to fetch documents");
   }
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
-  }
-  analyser = null;
-  analyserData = null;
-  if (voiceOrb) {
-    voiceOrb.removeAttribute("data-level");
-  }
+
+  return response.json();
 }
 
-function drawWaveform() {
-  if (!analyser || !analyserData || !waveformCanvas) {
-    return;
+async function fetchSessionMeta(activeEnv) {
+  const response = await fetch(`${getApiBase(activeEnv)}/session/meta`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch session metadata");
   }
-  const ctx = waveformCanvas.getContext("2d");
-  if (!ctx) {
-    return;
+
+  return response.json();
+}
+
+function WelcomeView({ status, onStart, activeEnv, onToggleEnv, name, passcode, onName, onPasscode }) {
+  return html`<div className="welcome">
+    <div className="welcome__card">
+      <button type="button" className="env env--welcome" onClick=${onToggleEnv}>
+        <span className="env__dot"></span>
+        ${activeEnv}
+      </button>
+      <div className="welcome__icon" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p className="welcome__title">Demo voice agent</p>
+      <h1>Talk to Pepper</h1>
+      <p className="welcome__subtitle">
+        Enter your details to request a LiveKit token and start the session.
+      </p>
+      <form className="welcome__form" onSubmit=${onStart}>
+        <label>
+          Name
+          <input
+            type="text"
+            placeholder="Your name"
+            value=${name}
+            onInput=${(event) => onName(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Passcode
+          <input
+            type="password"
+            placeholder="Shared passcode"
+            value=${passcode}
+            onInput=${(event) => onPasscode(event.target.value)}
+            required
+          />
+        </label>
+        <button className="welcome__cta" type="submit">Start call</button>
+      </form>
+      <p className="welcome__status">${status}</p>
+    </div>
+    <p className="welcome__footer">
+      
+    </p>
+  </div>`;
+}
+
+function ConnectionPill() {
+  const connectionState = useConnectionState();
+  const state = connectionState || "disconnected";
+  const label =
+    state === "connected"
+      ? "Connected"
+      : state === "connecting"
+      ? "Connecting"
+      : state === "reconnecting"
+      ? "Reconnecting"
+      : "Disconnected";
+
+  return html`<span className=${"pill pill--" + state}>${label}</span>`;
+}
+
+function SessionMetaCard({ roomName, identity, modelName }) {
+  return html`<section className="panel meta-card">
+    <header className="meta-card__header panel__header">
+      <span className="meta meta--quiet">Session</span>
+      <${ConnectionPill} />
+    </header>
+    <div className="meta-card__body">
+      <div className="meta-row">
+        <span className="meta-label">Identity</span>
+        <span className="meta-value">${identity || "-"}</span>
+      </div>
+      <div className="meta-row">
+        <span className="meta-label">Room</span>
+        <span className="meta-value">${roomName || "-"}</span>
+      </div>
+      <div className="meta-row">
+        <span className="meta-label">Model</span>
+        <span className="meta-value">${modelName || "-"}</span>
+      </div>
+    </div>
+  </section>`;
+}
+
+function TranscriptPanel() {
+  const transcriptions = useTranscriptions();
+  const { localParticipant } = useLocalParticipant();
+
+  const rows = useMemo(() => {
+    return transcriptions.map((item, index) => {
+      const identity =
+        item.participantInfo?.identity || item.streamInfo?.participantIdentity || "unknown";
+      return {
+        id: `transcript-${identity}-${index}`,
+        author: identity === localParticipant?.identity ? "You" : "Agent",
+        text: item.text,
+      };
+    });
+  }, [transcriptions, localParticipant]);
+
+  return html`<section className="panel panel--messages">
+    <header className="panel__header">
+      <h3>Transcript</h3>
+      <span>${rows.length}</span>
+    </header>
+    <div className="panel__body panel__body--messages">
+      ${rows.length === 0
+        ? html`<p className="panel__empty">Start speaking to see live transcription.</p>`
+        : rows.map(
+            (row) => html`<div className="message-item" key=${row.id}>
+              <span className="message-item__label">${row.author}</span>
+              <p>${row.text}</p>
+            </div>`
+          )}
+    </div>
+  </section>`;
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
   }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
 
-  analyser.getByteTimeDomainData(analyserData);
-  ctx.clearRect(0, 0, waveformWidth, waveformHeight);
+function FileUploadPanel({ files, onAddFiles, onRemoveFile }) {
+  const [dragging, setDragging] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const room = useRoomContext();
 
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(110, 231, 255, 0.9)";
-  ctx.beginPath();
-
-  let sumSquares = 0;
-  for (let i = 0; i < analyserData.length; i += 1) {
-    const value = analyserData[i] / 128 - 1;
-    sumSquares += value * value;
-    const x = (i / analyserData.length) * waveformWidth;
-    const y = (1 - (value + 1) / 2) * waveformHeight;
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
+  useEffect(() => {
+    if (!room) {
+      return undefined;
     }
-  }
-
-  ctx.stroke();
-
-  const rms = Math.sqrt(sumSquares / analyserData.length);
-  const level = rms > 0.2 ? "2" : rms > 0.08 ? "1" : "0";
-  if (voiceOrb) {
-    voiceOrb.setAttribute("data-level", level);
-  }
-
-  waveformAnimationId = requestAnimationFrame(drawWaveform);
-}
-
-async function connectSession() {
-  if (room) {
-    return;
-  }
-
-  const credentials = ensureCredentials();
-  if (!credentials) {
-    return;
-  }
-
-  setStatus("Requesting token...");
-  setConnectionState("connecting", "Connecting");
-  setCallButtonState("connecting");
-  callToggle.disabled = true;
-
-  try {
-    const { token, room: roomName, url } = await fetchToken(
-      credentials.name,
-      credentials.passcode
-    );
-
-    room = new LivekitClient.Room({
-      adaptiveStream: true,
-      dynacast: true,
-    });
-
-    room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
-      addSystemMessage(`Participant joined: ${participant.identity}`);
-    });
-
-    room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-      addSystemMessage(`Participant left: ${participant.identity}`);
-    });
-
-    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-      if (track.kind === "audio") {
-        const audioEl = track.attach();
-        audioEl.style.display = "none";
-        document.body.appendChild(audioEl);
-        addSystemMessage(`Audio track subscribed from ${participant.identity}`);
-      }
-    });
-
-    room.on(LivekitClient.RoomEvent.Disconnected, () => {
-      setStatus("Disconnected.");
-      setConnectionState(null, "Disconnected");
-      setCallButtonState(null);
-      setTextInputEnabled(false);
-      roomEl.textContent = "-";
-      participantEl.textContent = "-";
-      localIdentity = null;
-      localAudioTrack?.stop();
-      localAudioTrack = null;
-      stopWaveform();
-      clearConversation();
-      room = null;
-      callToggle.disabled = false;
-    });
-
-    await room.connect(url, token);
-    await room.startAudio();
-
-    localAudioTrack = await LivekitClient.createLocalAudioTrack({
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    });
-
-    await room.localParticipant.publishTrack(localAudioTrack);
-
-    const stream = new MediaStream([localAudioTrack.mediaStreamTrack]);
-    prepareWaveform(stream);
-
-    roomEl.textContent = roomName;
-    participantEl.textContent = credentials.name;
-    localIdentity = room.localParticipant?.identity || credentials.name;
-
-    setStatus("Connected. Speak to Robbie!");
-    setConnectionState("connected", "Connected");
-    setCallButtonState("connected");
-    callToggle.disabled = false;
-    setTextInputEnabled(true);
-
-    room.registerTextStreamHandler(TRANSCRIPTION_TOPIC, async (reader, participantInfo) => {
-      const attributes = reader.info?.attributes || {};
-      const segmentId = attributes["lk.segment_id"];
-      const transcribedTrackId = attributes["lk.transcribed_track_id"];
-      const senderIdentity =
-        participantInfo?.identity || reader.info?.participantIdentity || "unknown";
-
-      if (!transcribedTrackId) {
+    const handleData = (payload, participant, kind, topic) => {
+      if (topic !== "search_status") {
         return;
       }
-
-      const localId = room?.localParticipant?.identity || localIdentity;
-      const isLocalSpeaker = localId && senderIdentity === localId;
-      const kind = isLocalSpeaker ? "user" : "agent";
-      const senderLabel = isLocalSpeaker ? "You" : "Agent";
-      const key = segmentId ? `${senderIdentity}:${segmentId}` : null;
-
-      let lastText = "";
-      if (typeof reader.read === "function") {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            break;
-          }
-          if (value) {
-            lastText = value;
-            upsertTranscriptMessage({
-              key,
-              senderLabel,
-              kind,
-              text: value,
-              isFinal: false,
-            });
-          }
+      const text = new TextDecoder().decode(payload);
+      try {
+        const message = JSON.parse(text);
+        if (message.state === "start") {
+          setIsSearching(true);
         }
-      } else {
-        lastText = await reader.readAll();
+        if (message.state === "end") {
+          setIsSearching(false);
+        }
+      } catch (error) {
+        // ignore malformed payloads
       }
+    };
+    room.on(RoomEvent.DataReceived, handleData);
+    return () => {
+      room.off(RoomEvent.DataReceived, handleData);
+    };
+  }, [room]);
 
-      if (lastText) {
-        upsertTranscriptMessage({
-          key,
-          senderLabel,
-          kind,
-          text: lastText,
-          isFinal: true,
-        });
-      }
+  return html`<section
+    className=${"panel panel--files" + (isSearching ? " panel--searching" : "")}
+  >
+    <header className="panel__header">
+      <span className="meta">Documents</span>
+      <span>${files.length}</span>
+    </header>
+    <div className="panel__body">
+      <label
+        className=${"upload-card" + (dragging ? " upload-card--drag" : "")}
+        onDragOver=${(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave=${() => setDragging(false)}
+        onDrop=${(event) => {
+          event.preventDefault();
+          setDragging(false);
+          onAddFiles(event.dataTransfer.files);
+        }}
+      >
+        <input
+          type="file"
+          accept="application/pdf"
+          multiple
+          onChange=${(event) => {
+            onAddFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <span className="upload-card__title">Upload PDFs</span>
+        <span className="upload-card__meta">Drop or select files</span>
+      </label>
+      ${files.length === 0
+        ? html`<p className="panel__empty">No PDFs uploaded yet.</p>`
+        : html`<div className="file-scroll">
+            <div className="file-list">
+              ${files.map(
+                (file) => html`<div className="file-item" key=${file.id}>
+                  <div className="file-meta">
+                    <span className="file-name">${file.name}</span>
+                    <span className="file-size">${formatFileSize(file.size)}</span>
+                  </div>
+                  <span className=${"file-status file-status--" + file.status}>
+                    ${file.status === "ready"
+                      ? "Ready"
+                      : file.status === "error"
+                      ? "Failed"
+                      : "Preparing"}
+                  </span>
+                  <button
+                    type="button"
+                    className="file-remove"
+                    onClick=${() => onRemoveFile(file.id)}
+                  >
+                    Remove
+                  </button>
+                </div>`
+              )}
+            </div>
+          </div>`}
+    </div>
+  </section>`;
+}
+
+function AgentCanvas() {
+  const { state, audioTrack, videoTrack } = useVoiceAssistant();
+  const { localParticipant } = useLocalParticipant();
+  const cameraPub = localParticipant?.getTrackPublication(Track.Source.Camera);
+  const cameraTrack =
+    cameraPub && !cameraPub.isMuted
+      ? { participant: localParticipant, source: Track.Source.Camera, publication: cameraPub }
+      : undefined;
+  const [screenShareTrack] = useTracks([Track.Source.ScreenShare]);
+
+  const style = "pill";
+  const barCount = 7;
+
+  return html`<div className="agent-canvas">
+    <div className="agent-canvas__core">
+      ${videoTrack
+        ? html`<${VideoTrack} trackRef=${videoTrack} className="agent-canvas__video" />`
+        : html`<${BarVisualizer}
+            state=${state}
+            track=${audioTrack}
+            barCount=${barCount}
+            className=${"agent-visualizer agent-visualizer--" + style}
+          >
+            <span className="agent-visualizer__bar"></span>
+          </${BarVisualizer}>`}
+    </div>
+    <div className="agent-state">
+      <span className="agent-state__label">Pepper</span>
+      <span className=${"agent-state__pill agent-state__pill--" + state}>
+        ${state || "idle"}
+      </span>
+    </div>
+    <div className="agent-canvas__tiles">
+      ${cameraTrack
+        ? html`<div className="agent-tile">
+            <${VideoTrack} trackRef=${cameraTrack} className="agent-tile__video" />
+          </div>`
+        : null}
+      ${screenShareTrack
+        ? html`<div className="agent-tile">
+            <${VideoTrack} trackRef=${screenShareTrack} className="agent-tile__video" />
+          </div>`
+        : null}
+    </div>
+  </div>`;
+}
+
+function SessionView({
+  roomName,
+  displayName,
+  modelName,
+  onHangup,
+  files,
+  onAddFiles,
+  onRemoveFile,
+}) {
+  const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
+  const identity = displayName || localParticipant?.identity || "you";
+
+  return html`<section className="session-shell">
+    <${ConnectionStateToast} />
+    <${RoomAudioRenderer} />
+
+    <div className="session-shell__main">
+      <div className="session-shell__canvas">
+        <div className="session-shell__canvas-header panel__header">
+          <span className="meta">Agent canvas</span>
+          <span className="pill pill--connected">Live</span>
+        </div>
+        <${AgentCanvas} />
+        <div className="canvas-controls">
+          <${StartAudio} label="Enable audio" className="lk-start-audio" />
+          <${TrackToggle}
+            source=${Track.Source.Microphone}
+            showIcon=${true}
+            className="control-bar__button"
+          />
+          <button
+            type="button"
+            className="control-bar__button control-bar__button--danger"
+            onClick=${() => {
+              room?.disconnect();
+              onHangup?.();
+            }}
+          >
+            Hang up
+          </button>
+        </div>
+      </div>
+
+      <aside className="session-shell__side">
+        <${SessionMetaCard}
+          roomName=${roomName}
+          identity=${identity}
+          modelName=${modelName}
+        />
+        <${FileUploadPanel}
+          files=${files}
+          onAddFiles=${onAddFiles}
+          onRemoveFile=${onRemoveFile}
+        />
+      </aside>
+    </div>
+
+  </section>`;
+}
+
+function App() {
+  const [activeEnv, setActiveEnv] = useState(resolveEnvironment());
+  const [name, setName] = useState("");
+  const [passcode, setPasscode] = useState("");
+  const [status, setStatus] = useState("Ready when you are.");
+  const [token, setToken] = useState(undefined);
+  const [serverUrl, setServerUrl] = useState(undefined);
+  const [roomName, setRoomName] = useState("-");
+  const [displayName, setDisplayName] = useState("");
+  const [modelName, setModelName] = useState("-");
+  const [shouldConnect, setShouldConnect] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [docsLoaded, setDocsLoaded] = useState(false);
+
+  const toggleEnv = () => {
+    const nextEnv = activeEnv === "local" ? "prod" : "local";
+    setActiveEnv(nextEnv);
+    localStorage.setItem(ENV_STORAGE_KEY, nextEnv);
+  };
+
+  const startSession = async (event) => {
+    event?.preventDefault();
+    if (!name.trim() || !passcode.trim()) {
+      setStatus("Add name and passcode to start.");
+      return;
+    }
+
+    setStatus("Requesting token...");
+    try {
+      const response = await fetchToken(activeEnv, name.trim(), passcode.trim());
+      setToken(response.token);
+      setServerUrl(response.url);
+      setRoomName(response.room);
+      setDisplayName(name.trim());
+      setShouldConnect(true);
+      setStatus("Connecting to LiveKit...");
+    } catch (error) {
+      setStatus(error?.message || "Failed to connect.");
+      setShouldConnect(false);
+    }
+  };
+
+  const handleDisconnected = () => {
+    setStatus("Disconnected.");
+    setShouldConnect(false);
+    setToken(undefined);
+    setServerUrl(undefined);
+    setRoomName("-");
+    setFiles([]);
+    setDocsLoaded(false);
+    setModelName("-");
+  };
+
+  const loadDocuments = async (userName) => {
+    if (docsLoaded) {
+      return;
+    }
+    try {
+      const response = await listDocuments(activeEnv, userName, passcode);
+      const documents = response.documents || [];
+      setFiles(
+        documents.map((doc) => ({
+          id: `${doc.source}-${Math.random().toString(16).slice(2)}`,
+          name: doc.name,
+          size: doc.size || 0,
+          status: "ready",
+          source: doc.source,
+        }))
+      );
+      setDocsLoaded(true);
+    } catch (error) {
+      // ignore initial load errors
+    }
+  };
+
+  const handleAddFiles = async (fileList) => {
+    if (!fileList?.length) {
+      return;
+    }
+    const userName = displayName || name || "Guest";
+    const nextFiles = Array.from(fileList)
+      .filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
+      .map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(16).slice(2)}`,
+        name: file.name,
+        size: file.size,
+        status: "processing",
+        source: "",
+      }));
+    if (nextFiles.length === 0) {
+      return;
+    }
+    setFiles((prev) => [...prev, ...nextFiles]);
+    const filesArray = Array.from(fileList).filter(
+      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    );
+    await Promise.all(
+      nextFiles.map(async (entry, index) => {
+        const file = filesArray[index];
+        try {
+          const response = await uploadDocument(activeEnv, userName, passcode, file);
+          setFiles((prev) =>
+            prev.map((item) =>
+              item.id === entry.id
+                ? { ...item, status: "ready", source: response.source || "" }
+                : item
+            )
+          );
+        } catch (error) {
+          setFiles((prev) =>
+            prev.map((item) =>
+              item.id === entry.id ? { ...item, status: "error" } : item
+            )
+          );
+        }
+      })
+    );
+  };
+
+  const handleRemoveFile = (id) => {
+    let removedFile;
+    setFiles((prev) => {
+      removedFile = prev.find((file) => file.id === id);
+      return prev.filter((file) => file.id !== id);
     });
+    if (removedFile?.source) {
+      const userName = displayName || name || "Guest";
+      deleteDocument(activeEnv, userName, passcode, removedFile.source).catch(() => {});
+    }
+  };
 
-    addSystemMessage("Transcription stream ready. Start speaking.");
-  } catch (error) {
-    const message = error?.message || "Failed to connect.";
-    setStatus(message);
-    setConnectionState("error", "Error");
-    setCallButtonState(null);
-    callToggle.disabled = false;
-    room = null;
-    stopWaveform();
-  }
+  return html`<div className="page">
+    ${token
+      ? html`<${LiveKitRoom}
+          token=${token}
+          serverUrl=${serverUrl}
+          connect=${shouldConnect}
+          audio=${{ echoCancellation: true, noiseSuppression: true, autoGainControl: true }}
+          video=${false}
+          onConnected=${() => {
+            setStatus("Connected. Speak to Pepper!");
+            const userName = displayName || name || "Guest";
+            loadDocuments(userName);
+            fetchSessionMeta(activeEnv)
+              .then((data) => {
+                setModelName(data?.model_name || "-");
+              })
+              .catch(() => {
+                setModelName("-");
+              });
+          }}
+          onDisconnected=${handleDisconnected}
+          onError=${(error) => setStatus(error?.message || "LiveKit error.")}
+          data-lk-theme="default"
+        >
+              <${SessionView}
+                roomName=${roomName}
+                displayName=${displayName}
+                modelName=${modelName}
+                onHangup=${handleDisconnected}
+                files=${files}
+                onAddFiles=${handleAddFiles}
+                onRemoveFile=${handleRemoveFile}
+              />
+            </${LiveKitRoom}>`
+      : html`<${WelcomeView}
+          status=${status}
+          onStart=${startSession}
+          activeEnv=${activeEnv}
+          onToggleEnv=${toggleEnv}
+          name=${name}
+          passcode=${passcode}
+          onName=${setName}
+          onPasscode=${setPasscode}
+        />`}
+  </div>`;
 }
 
-async function disconnectSession() {
-  if (!room) {
-    return;
-  }
-  setStatus("Disconnecting...");
-  setConnectionState("connecting", "Disconnecting");
-  setCallButtonState("disconnecting");
-  callToggle.disabled = true;
-
-  try {
-    await room.disconnect();
-  } finally {
-    room = null;
-    localAudioTrack?.stop();
-    localAudioTrack = null;
-    stopWaveform();
-    clearConversation();
-    setCallButtonState(null);
-    callToggle.disabled = false;
-    setConnectionState(null, "Disconnected");
-    setTextInputEnabled(false);
-  }
-}
-
-function toggleMute() {
-  if (!room || !room.localParticipant) {
-    return;
-  }
-  isMuted = !isMuted;
-  room.localParticipant.setMicrophoneEnabled(!isMuted).catch(() => {
-    addSystemMessage("Could not update microphone state.");
-  });
-  micToggle.setAttribute("aria-pressed", String(isMuted));
-}
-
-function toggleKeyboard() {
-  isKeyboardOpen = !isKeyboardOpen;
-  keyboardToggle.setAttribute("aria-pressed", String(isKeyboardOpen));
-  textInput.classList.toggle("active", isKeyboardOpen);
-  if (isKeyboardOpen) {
-    chatInput.focus();
-  }
-}
-
-async function sendMessage() {
-  if (!room || chatInput.disabled) {
-    return;
-  }
-  const message = chatInput.value.trim();
-  if (!message) {
-    return;
-  }
-
-  chatInput.value = "";
-  createMessageElement({ senderLabel: "You", text: message, kind: "user" });
-
-  try {
-    await room.localParticipant.sendText(message, { topic: CHAT_TOPIC });
-  } catch (error) {
-    addSystemMessage(`Failed to send message: ${error.message}`);
-  }
-}
-
-updateEnvUI();
-setTextInputEnabled(false);
-
-if (envToggle) {
-  envToggle.addEventListener("click", () => {
-    activeEnv = activeEnv === "local" ? "prod" : "local";
-    localStorage.setItem(ENV_STORAGE_KEY, activeEnv);
-    updateEnvUI();
-  });
-}
-
-callToggle.addEventListener("click", async () => {
-  if (room) {
-    await disconnectSession();
-  } else {
-    await connectSession();
-  }
-});
-
-micToggle.addEventListener("click", () => {
-  toggleMute();
-});
-
-keyboardToggle.addEventListener("click", () => {
-  toggleKeyboard();
-});
-
-chatSend.addEventListener("click", () => {
-  sendMessage();
-});
-
-chatInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
-});
-
-window.addEventListener("resize", () => {
-  resizeWaveform();
-});
+const root = createRoot(document.getElementById("app"));
+root.render(html`<${App} />`);
