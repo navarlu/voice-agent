@@ -1,5 +1,11 @@
 # Robbie Voice Agent Demo
 
+Showcase of a LiveKit voice agent with a function tool that searches a vector database (RAG). Users can try it on GitHub Pages after entering the passcode at:
+
+```
+https://navarlu.github.io/voice-agent/
+```
+
 Static GitHub Pages UI + FastAPI token server for a LiveKit voice agent. The agent code now lives separately from the token server so you can run/deploy them independently.
 
 ## Architecture
@@ -61,7 +67,6 @@ Keep one virtualenv at repo root (ignored by git) and install a single shared re
 
 ```
 uv venv
-source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
@@ -93,6 +98,14 @@ const TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
 
 Publish the `docs/` folder with GitHub Pages.
 
+### 7) Run local static UI server
+
+Serve the static UI locally:
+
+```
+uv run python -m http.server 5500 --directory docs
+```
+
 ### Local UI toggle
 
 The UI now auto-switches to local endpoints on `localhost`. You can also force it:
@@ -102,8 +115,3 @@ The UI now auto-switches to local endpoints on `localhost`. You can also force i
 
 The selection is persisted in localStorage.
 
-## Notes
-
-- CORS only blocks browsers; still require a passcode.
-- For tighter control, rotate passcodes or add one-time tokens.
-- This demo is WebRTC-only. SIP is for phone dialing and doesn’t apply to GitHub Pages.

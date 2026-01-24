@@ -142,7 +142,7 @@ function WelcomeView({ status, onStart, activeEnv, onToggleEnv, name, passcode, 
       <p className="welcome__title">Demo voice agent</p>
       <h1>Talk to Pepper</h1>
       <p className="welcome__subtitle">
-        Enter your details to request a LiveKit token and start the session.
+        about your day or the documents you upload
       </p>
       <form className="welcome__form" onSubmit=${onStart}>
         <label>
