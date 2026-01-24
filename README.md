@@ -1,6 +1,16 @@
 # Voice Agent Demo
 
-Showcase of a LiveKit voice agent with a function tool that searches a vector database (RAG). This guide covers running everything locally.
+Showcase of a LiveKit voice agent with a function tool that searches a vector database (RAG). You can try the hosted demo at:
+
+```
+https://navarlu.github.io/voice-agent/
+```
+
+Enter the passcode when prompted (contact `navarlu2@fel.cvut.cz` to get it). This guide covers running everything locally.
+
+## Screenshot
+
+![Voice Agent Demo](docs/screenshot.png)
 
 ## Architecture
 
@@ -11,14 +21,14 @@ Showcase of a LiveKit voice agent with a function tool that searches a vector da
 
 ## Setup
 
-### 0) Clone the repo
+### 1) Clone the repo
 
 ```
 git clone https://github.com/navarlu/voice-agent.git
 cd voice-agent
 ```
 
-### 1) Local LiveKit and Weaviate (Docker)
+### 2) Local LiveKit and Weaviate (Docker)
 
 For local dev, spin up LiveKit + Redis + Weaviate:
 
@@ -26,31 +36,6 @@ For local dev, spin up LiveKit + Redis + Weaviate:
 docker compose \
   --env-file .env \
   -f local/docker-compose.yml up -d
-```
-
-Update your `.env` for local:
-
-```
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=LK_LOCAL_KEY
-LIVEKIT_API_SECRET=LK_LOCAL_SECRET
-ALLOWED_ORIGINS=http://localhost:5500
-```
-
-`local/livekit.yaml` contains the matching key/secret. Change both if you prefer your own values.
-
-### 2) Shared env file
-
-Create a single `.env` in the repo root (next to this README). Both the token server and the agent read from it:
-
-```
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=LK_LOCAL_KEY
-LIVEKIT_API_SECRET=LK_LOCAL_SECRET
-DEMO_PASSCODE=...
-ALLOWED_ORIGINS=http://localhost:5500
-ROOM_PREFIX=robbie
-OPENAI_API_KEY=...
 ```
 
 ### 3) Python env + deps (single venv, single requirements)
@@ -67,8 +52,6 @@ uv pip install -r requirements.txt
 ```
 uv run uvicorn token_server.token_service:app --host 0.0.0.0 --port 8001
 ```
-
-If your reverse proxy routes `/api/` to this server, map `/api/token` → `/token`.
 
 ### 5) Run the voice agent
 
@@ -88,8 +71,30 @@ Serve the static UI locally:
 uv run python -m http.server 5500 --directory docs
 ```
 
-### Local UI toggle
+Open the UI in your browser:
+
+```
+http://localhost:5500/?env=local
+```
+
+### 7) Local UI toggle
 
 The UI auto-switches to local endpoints on `localhost`. You can also force it:
 
 - `?env=local` → uses `http://localhost:8001/token`
+
+### 8) Shared env file
+
+Create a single `.env` in the repo root (next to this README). Both the token server and the agent read from it:
+
+```
+LIVEKIT_URL=ws://localhost:7880
+LIVEKIT_API_KEY=LK_LOCAL_KEY
+LIVEKIT_API_SECRET=LK_LOCAL_SECRET
+DEMO_PASSCODE=...
+ALLOWED_ORIGINS=http://localhost:5500
+ROOM_PREFIX=robbie
+OPENAI_API_KEY=...
+```
+
+`local/livekit.yaml` contains the matching key/secret. Change both if you prefer your own values.
