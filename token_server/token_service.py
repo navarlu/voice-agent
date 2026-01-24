@@ -24,7 +24,7 @@ if str(AGENT_DIR) not in sys.path:
 import pdf_ingest  # noqa: E402
 import weaviate_utils  # noqa: E402
 try:  # noqa: E402
-    from voice_agent_realtime_mini import MODEL_NAME as AGENT_MODEL_NAME  # type: ignore
+    from voice_agent_realtime import MODEL_NAME as AGENT_MODEL_NAME  # type: ignore
 except Exception:
     AGENT_MODEL_NAME = "unknown"
 
