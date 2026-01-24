@@ -32,11 +32,11 @@ Create a single `.env` in the repo root. Both the token server and the agent rea
 
 ```
 LIVEKIT_URL=ws://localhost:7880
+ALLOWED_ORIGINS=http://localhost:5500
+ROOM_PREFIX=...
 LIVEKIT_API_KEY=LK_LOCAL_KEY
 LIVEKIT_API_SECRET=LK_LOCAL_SECRET
 DEMO_PASSCODE=...
-ALLOWED_ORIGINS=http://localhost:5500
-ROOM_PREFIX=...
 OPENAI_API_KEY=...
 ```
 
@@ -72,7 +72,7 @@ uv run uvicorn token_server.token_service:app --host 0.0.0.0 --port 8001
 In another shell (same virtualenv):
 
 ```
-uv run python agent/voice_agent.py
+uv run python agent/voice_agent_realtime.py dev
 ```
 
 The agent will join LiveKit and greet the first participant.
@@ -91,8 +91,3 @@ Open the UI in your browser:
 http://localhost:5500/?env=local
 ```
 
-### 8) Local UI toggle
-
-The UI auto-switches to local endpoints on `localhost`. You can also force it:
-
-- `?env=local` → uses `http://localhost:8001/token`
