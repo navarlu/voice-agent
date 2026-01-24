@@ -10,7 +10,7 @@ Enter the passcode when prompted (contact `navarlu2@fel.cvut.cz` to get it). Thi
 
 ## Screenshot
 
-![Voice Agent Demo](docs/screenshot.png)
+![Voice Agent Demo](assets/showcase.png)
 
 ## Architecture
 
