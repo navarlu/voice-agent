@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from livekit.api import AccessToken, VideoGrants
 
 
-# Always load env from repo root so running from token_server/ still works
+# Always load env from repo root so running from api_server/ still works
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -21,9 +21,9 @@ AGENT_DIR = BASE_DIR / "agent"
 if str(AGENT_DIR) not in sys.path:
     sys.path.append(str(AGENT_DIR))
 
-import pdf_ingest  # noqa: E402
-import weaviate_utils  # noqa: E402
-try:  # noqa: E402
+import pdf_ingest  
+import weaviate_utils  
+try: 
     from voice_agent_realtime import MODEL_NAME as AGENT_MODEL_NAME  # type: ignore
 except Exception:
     AGENT_MODEL_NAME = "unknown"
@@ -83,7 +83,7 @@ if ALLOWED_ORIGINS:
     )
 
 print(
-    "[token_service] config",
+    "[api] config",
     {
         "LIVEKIT_URL": LIVEKIT_URL,
         "LIVEKIT_API_KEY": _mask(LIVEKIT_API_KEY),
@@ -140,11 +140,11 @@ def mint_token(payload: TokenRequest) -> TokenResponse:
         )
         jwt = token.to_jwt()
     except Exception as exc:
-        print("[token_service] token generation failed:", repr(exc))
+        print("[api] token generation failed:", repr(exc))
         raise
 
     print(
-        "[token_service] issued token",
+        "[api] issued token",
         {"room": room_name, "identity": identity, "name": payload.name.strip()},
     )
 

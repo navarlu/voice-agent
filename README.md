@@ -13,7 +13,7 @@ Enter the passcode when prompted (contact `navarlu2@fel.cvut.cz` to get it). Thi
 ## Architecture
 
 - `docs/` → Local static UI (WebRTC via LiveKit JS)
-- `token_server/` → FastAPI service that mints LiveKit tokens
+- `api_server/` → FastAPI service for tokens + document endpoints
 - `agent/` → LiveKit agent process (LLM/STT/TTS)
 - LiveKit server → local Docker services (LiveKit + Redis + Weaviate)
 
@@ -54,7 +54,7 @@ docker compose \
 
 ### 4) Python env + deps (single venv, single requirements)
 
-Keep one virtualenv at repo root (ignored by git) and install a single shared requirements file:
+Keep one virtualenv at repo root and install a single shared requirements file:
 
 ```
 uv venv
@@ -64,7 +64,7 @@ uv pip install -r requirements.txt
 ### 5) Run token server
 
 ```
-uv run uvicorn token_server.token_service:app --host 0.0.0.0 --port 8001
+uv run uvicorn api_server.api:app --host 0.0.0.0 --port 8001
 ```
 
 ### 6) Run the voice agent
@@ -90,4 +90,3 @@ Open the UI in your browser:
 ```
 http://localhost:5500/?env=local
 ```
-

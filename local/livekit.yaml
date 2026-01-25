@@ -6,4 +6,4 @@ rtc:
 redis:
   address: redis:6379
 keys:
-  LK_LOCAL_KEY: LK_LOCAL_SECRET
+  LK_LOCAL_KEY: p19p7OEfzheSYRM0iHCne83p92bPCMyZ8A
