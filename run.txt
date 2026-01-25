@@ -8,3 +8,6 @@ Start web for local test:
 uv run python -m http.server 5500 --directory docs
 
 http://localhost:5500/?env=local
+
+tmux attach -t voice
+tmux attach -t api_server
