@@ -64,7 +64,7 @@ uv pip install -r requirements.txt
 ### 5) Run token server
 
 ```
-uv run uvicorn api_server.api:app --host 0.0.0.0 --port 8001
+uv run uvicorn api_server.api:app --host 0.0.0.0 --port 8000
 ```
 
 ### 6) Run the voice agent
