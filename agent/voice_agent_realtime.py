@@ -36,6 +36,7 @@ from config import (
 
 load_dotenv(BASE_DIR / ".env")
 
+FALLBACK_TTS = False
 
 
 def _load_store() -> dict:
@@ -125,14 +126,16 @@ async def entrypoint(ctx: JobContext):
     user_record["sessions"].append(session_record)
     _save_store(store)
 
-    session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
+    session_kwargs = {
+        "llm": openai.realtime.RealtimeModel(
             model=MODEL_NAME,
             voice="alloy",
             api_key=os.getenv("OPENAI_API_KEY"),
         ),
-        tts=openai.TTS(model="gpt-4o-mini-tts", voice="alloy"),
-    )
+    }
+    if FALLBACK_TTS:
+        session_kwargs["tts"] = openai.TTS(model="gpt-4o-mini-tts", voice="alloy")
+    session = AgentSession(**session_kwargs)
 
     def handle_conversation_item(event) -> None:
         message = getattr(event, "item", None)
