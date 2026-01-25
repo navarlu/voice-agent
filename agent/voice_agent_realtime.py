@@ -95,7 +95,7 @@ async def entrypoint(ctx: JobContext):
 
     @function_tool
     async def query_search(context: RunContext, query: str, limit: int = 5):
-        """Search the user's document collection for relevant information."""
+        """MANDATORY FIRST STEP. Search the user's private knowledge base."""
         print(f"[search] query={query!r} limit={limit} collection={collection_name}")
         payload = json.dumps({"state": "start", "query": query}, ensure_ascii=False)
         await ctx.room.local_participant.publish_data(payload, topic="search_status")
