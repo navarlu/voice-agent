@@ -39,6 +39,7 @@ ALLOWED_ORIGINS = [
 ]
 ROOM_PREFIX = os.getenv("ROOM_PREFIX", "realtime-demo")
 UPLOADS_DIR = BASE_DIR / "local" / "uploads"
+DEFAULT_PDFS_DIR = BASE_DIR / "data" / "VSCHT" / "pdfs"
 
 
 def _mask(value: str) -> str:
@@ -47,6 +48,25 @@ def _mask(value: str) -> str:
     if len(value) <= 4:
         return "*" * len(value)
     return f"{value[:2]}***{value[-2:]}"
+
+
+def _seed_user_pdfs(collection_name: str) -> dict:
+    sources = weaviate_utils.list_sources(collection_name=collection_name, limit=1)
+    if sources:
+        return {"seeded": False, "count": 0, "chunks": 0}
+    if not DEFAULT_PDFS_DIR.exists():
+        print(f"[seed] pdf directory missing: {DEFAULT_PDFS_DIR}")
+        return {"seeded": False, "count": 0, "chunks": 0}
+    pdf_paths = sorted(DEFAULT_PDFS_DIR.glob("*.pdf"))
+    if not pdf_paths:
+        print(f"[seed] no pdfs found in: {DEFAULT_PDFS_DIR}")
+        return {"seeded": False, "count": 0, "chunks": 0}
+    print(f"[seed] uploading {len(pdf_paths)} pdfs for collection: {collection_name}")
+    total_chunks = 0
+    for pdf_path in pdf_paths:
+        result = pdf_ingest.ingest_pdf_file(pdf_path, collection_name=collection_name)
+        total_chunks += int(result.get("chunks", 0))
+    return {"seeded": True, "count": len(pdf_paths), "chunks": total_chunks}
 
 
 class TokenRequest(BaseModel):
@@ -220,6 +240,9 @@ def list_documents(payload: ListDocumentsRequest):
     user_name = payload.name.strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
     sources = weaviate_utils.list_sources(collection_name=collection_name)
+    if not sources:
+        _seed_user_pdfs(collection_name)
+        sources = weaviate_utils.list_sources(collection_name=collection_name)
     items = []
     for entry in sources:
         source = entry.get("source", "")
