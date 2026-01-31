@@ -40,7 +40,7 @@ Tvoje jméno je Robí. Když se tě někdo zeptá, kdo jsi, odpověz přirozeně
 Pokud se tě přímo nezeptají, nezmiňuj, že jsi AI. Vždy zůstávej v roli.
 """
 
-MODEL_NAME = "gpt-realtime-mini"
+MODEL_NAME = "gpt-realtime"
 WEB_SEARCH_MODEL = "gpt-5"
 WEB_SEARCH_ALLOWED_DOMAINS = ["vscht.cz", "www.vscht.cz"]
 
