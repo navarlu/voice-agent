@@ -332,7 +332,9 @@ function FileUploadPanel({ files, onAddFiles, onRemoveFile }) {
                 (file) => html`<div className="file-item" key=${file.id}>
                   <div className="file-meta">
                     <span className="file-name">${file.name}</span>
-                    <span className="file-size">${formatFileSize(file.size)}</span>
+                    <span className="file-size">
+                      ${formatFileSize(file.size)}${file.origin === "seed" ? " • Seed" : ""}
+                    </span>
                   </div>
                   <span className=${"file-status file-status--" + file.status}>
                     ${file.status === "ready"
@@ -341,13 +343,15 @@ function FileUploadPanel({ files, onAddFiles, onRemoveFile }) {
                       ? "Failed"
                       : "Preparing"}
                   </span>
-                  <button
-                    type="button"
-                    className="file-remove"
-                    onClick=${() => onRemoveFile(file.id)}
-                  >
-                    Remove
-                  </button>
+                  ${file.deletable
+                    ? html`<button
+                        type="button"
+                        className="file-remove"
+                        onClick=${() => onRemoveFile(file.id)}
+                      >
+                        Remove
+                      </button>`
+                    : html`<span className="file-lock">Locked</span>`}
                 </div>`
               )}
             </div>
@@ -531,6 +535,8 @@ function App() {
           size: doc.size || 0,
           status: "ready",
           source: doc.source,
+          deletable: doc.deletable !== false,
+          origin: doc.origin || "user",
         }))
       );
       setDocsLoaded(true);
@@ -552,6 +558,8 @@ function App() {
         size: file.size,
         status: "processing",
         source: "",
+        deletable: true,
+        origin: "user",
       }));
     if (nextFiles.length === 0) {
       return;

@@ -603,6 +603,17 @@ p {
   cursor: pointer;
 }
 
+.file-lock {
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(148, 163, 184, 0.12);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .panel__empty {
   margin: 0;
   color: var(--muted);

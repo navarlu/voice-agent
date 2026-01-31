@@ -16,6 +16,7 @@ WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
 WEAVIATE_HTTP_PORT = int(os.getenv("WEAVIATE_HTTP_PORT", "8080"))
 WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
 WEAVIATE_COLLECTION = os.getenv("WEAVIATE_COLLECTION", "vector_database_v001")
+WEAVIATE_SEED_COLLECTION = os.getenv("WEAVIATE_SEED_COLLECTION", "seed_vscht")
 WEAVIATE_OPENAI_MODEL = os.getenv("WEAVIATE_OPENAI_MODEL", "text-embedding-3-large")
 WEAVIATE_SEARCH_MODE = os.getenv("WEAVIATE_SEARCH_MODE", "hybrid") #semantic
 WEAVIATE_HYBRID_ALPHA = float(os.getenv("WEAVIATE_HYBRID_ALPHA", "0.7"))
@@ -32,6 +33,11 @@ def normalize_collection_name(user_name: str) -> str:
     if not safe:
         safe = "guest"
     return f"user_{safe}"
+
+
+def seed_collection_name() -> str:
+    value = (WEAVIATE_SEED_COLLECTION or "").strip()
+    return value or "seed_vscht"
 
 
 def connect_client():
@@ -394,3 +400,30 @@ def search_txt(query: str, limit: int = 5, collection_name: str = WEAVIATE_COLLE
     if mode == "hybrid":
         return search_hybrid(query=query, limit=limit, collection_name=collection_name)
     return search_semantic(query=query, limit=limit, collection_name=collection_name)
+
+
+def _rank_result(item: dict) -> float:
+    score = item.get("score")
+    if isinstance(score, (int, float)):
+        return float(score)
+    distance = item.get("distance")
+    if isinstance(distance, (int, float)):
+        return 1.0 / (1.0 + float(distance))
+    return 0.0
+
+
+def search_across_collections(
+    query: str,
+    limit: int,
+    collection_names: Iterable[str],
+) -> list[dict]:
+    results: list[dict] = []
+    for name in collection_names:
+        if not name:
+            continue
+        hits = search_txt(query=query, limit=limit, collection_name=name)
+        for hit in hits:
+            hit.setdefault("collection", name)
+            results.append(hit)
+    results.sort(key=_rank_result, reverse=True)
+    return results[:limit]

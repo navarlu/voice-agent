@@ -39,7 +39,6 @@ ALLOWED_ORIGINS = [
 ]
 ROOM_PREFIX = os.getenv("ROOM_PREFIX", "realtime-demo")
 UPLOADS_DIR = BASE_DIR / "local" / "uploads"
-DEFAULT_PDFS_DIR = BASE_DIR / "data" / "VSCHT" / "pdfs"
 
 
 def _mask(value: str) -> str:
@@ -50,23 +49,6 @@ def _mask(value: str) -> str:
     return f"{value[:2]}***{value[-2:]}"
 
 
-def _seed_user_pdfs(collection_name: str) -> dict:
-    sources = weaviate_utils.list_sources(collection_name=collection_name, limit=1)
-    if sources:
-        return {"seeded": False, "count": 0, "chunks": 0}
-    if not DEFAULT_PDFS_DIR.exists():
-        print(f"[seed] pdf directory missing: {DEFAULT_PDFS_DIR}")
-        return {"seeded": False, "count": 0, "chunks": 0}
-    pdf_paths = sorted(DEFAULT_PDFS_DIR.glob("*.pdf"))
-    if not pdf_paths:
-        print(f"[seed] no pdfs found in: {DEFAULT_PDFS_DIR}")
-        return {"seeded": False, "count": 0, "chunks": 0}
-    print(f"[seed] uploading {len(pdf_paths)} pdfs for collection: {collection_name}")
-    total_chunks = 0
-    for pdf_path in pdf_paths:
-        result = pdf_ingest.ingest_pdf_file(pdf_path, collection_name=collection_name)
-        total_chunks += int(result.get("chunks", 0))
-    return {"seeded": True, "count": len(pdf_paths), "chunks": total_chunks}
 
 
 class TokenRequest(BaseModel):
@@ -230,6 +212,10 @@ def delete_document(payload: DeleteDocumentRequest):
     _verify_passcode(payload.passcode)
     user_name = payload.name.strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
+    seed_collection = weaviate_utils.seed_collection_name()
+    seed_sources = weaviate_utils.list_sources(collection_name=seed_collection)
+    if any((entry.get("source", "").split("#", 1)[0] == payload.source) for entry in seed_sources):
+        raise HTTPException(status_code=403, detail="Seed documents cannot be deleted")
     deleted = weaviate_utils.delete_source(payload.source, collection_name=collection_name)
     return {"status": "ok", "deleted": deleted}
 
@@ -239,12 +225,11 @@ def list_documents(payload: ListDocumentsRequest):
     _verify_passcode(payload.passcode)
     user_name = payload.name.strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
-    sources = weaviate_utils.list_sources(collection_name=collection_name)
-    if not sources:
-        _seed_user_pdfs(collection_name)
-        sources = weaviate_utils.list_sources(collection_name=collection_name)
+    seed_collection = weaviate_utils.seed_collection_name()
+    user_sources = weaviate_utils.list_sources(collection_name=collection_name)
+    seed_sources = weaviate_utils.list_sources(collection_name=seed_collection)
     items = []
-    for entry in sources:
+    for entry in seed_sources:
         source = entry.get("source", "")
         base = source.split("#", 1)[0] if source else ""
         name = Path(base).name if base else "document.pdf"
@@ -260,6 +245,28 @@ def list_documents(payload: ListDocumentsRequest):
                 "name": name,
                 "size": size,
                 "chunks": entry.get("count", 0),
+                "origin": "seed",
+                "deletable": False,
+            }
+        )
+    for entry in user_sources:
+        source = entry.get("source", "")
+        base = source.split("#", 1)[0] if source else ""
+        name = Path(base).name if base else "document.pdf"
+        size = 0
+        if base and Path(base).exists():
+            try:
+                size = Path(base).stat().st_size
+            except OSError:
+                size = 0
+        items.append(
+            {
+                "source": base,
+                "name": name,
+                "size": size,
+                "chunks": entry.get("count", 0),
+                "origin": "user",
+                "deletable": True,
             }
         )
     return {"status": "ok", "documents": items}
