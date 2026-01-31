@@ -9,3 +9,6 @@ weaviate-client==4.19.2
 pymupdf==1.26.7
 langchain-text-splitters==1.1.0
 python-multipart==0.0.21
+openai==2.16.0
+Markdown==3.10.1
+weasyprint==68.0

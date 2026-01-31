@@ -2,7 +2,7 @@ Start token server:
 uv run uvicorn api_server.api:app --host 0.0.0.0 --port 8001
 
 Start agent:
-uv run python agent/voice_agent.py dev
+uv run python agent/voice_agent_realtime.py dev
 
 Start web for local test:
 uv run python -m http.server 5500 --directory docs

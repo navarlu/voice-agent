@@ -140,7 +140,7 @@ function WelcomeView({ status, onStart, activeEnv, onToggleEnv, name, passcode, 
         <span></span>
       </div>
       <p className="welcome__title">Demo voice agent</p>
-      <h1>Talk to Pepper</h1>
+      <h1>Talk to Robbie</h1>
       <p className="welcome__subtitle">
         about your day or the documents you upload
       </p>
@@ -383,7 +383,7 @@ function AgentCanvas() {
           </${BarVisualizer}>`}
     </div>
     <div className="agent-state">
-      <span className="agent-state__label">Pepper</span>
+      <span className="agent-state__label">Robbie</span>
       <span className=${"agent-state__pill agent-state__pill--" + state}>
         ${state || "idle"}
       </span>
@@ -604,7 +604,7 @@ function App() {
           audio=${{ echoCancellation: true, noiseSuppression: true, autoGainControl: true }}
           video=${false}
           onConnected=${() => {
-            setStatus("Connected. Speak to Pepper!");
+            setStatus("Connected. Speak to Robbie!");
             const userName = displayName || name || "Guest";
             loadDocuments(userName);
             fetchSessionMeta(activeEnv)
