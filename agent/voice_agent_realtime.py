@@ -129,12 +129,12 @@ async def entrypoint(ctx: JobContext):
     session_kwargs = {
         "llm": openai.realtime.RealtimeModel(
             model=MODEL_NAME,
-            voice="Ceder",
+            voice="Cedar",
             api_key=os.getenv("OPENAI_API_KEY"),
         ),
     }
     if FALLBACK_TTS:
-        session_kwargs["tts"] = openai.TTS(model="gpt-4o-mini-tts", voice="Ceder")
+        session_kwargs["tts"] = openai.TTS(model="gpt-4o-mini-tts", voice="Cedar")
     session = AgentSession(**session_kwargs)
 
     def handle_conversation_item(event) -> None:
