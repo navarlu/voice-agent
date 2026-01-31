@@ -129,7 +129,7 @@ async def entrypoint(ctx: JobContext):
     session_kwargs = {
         "llm": openai.realtime.RealtimeModel(
             model=MODEL_NAME,
-            voice="Marin",
+            voice="Cedar",
             api_key=os.getenv("OPENAI_API_KEY"),
         ),
     }
