@@ -22,11 +22,13 @@ from livekit.plugins import openai
 BASE_DIR = Path(__file__).resolve().parent.parent
 TRANSCRIPT_STORE = BASE_DIR / "local" / "session_transcripts.json"
 SRC_DIR = BASE_DIR / "src"
+DEFAULT_PDFS_DIR = BASE_DIR / "data" / "VSCHT" / "pdfs"
 
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 import weaviate_utils  
+import pdf_ingest  
 from config import (  
     GREETING_INSTRUCTIONS,
     GREETING_USER_INPUT,
@@ -61,6 +63,36 @@ def _save_store(data: dict) -> None:
     tmp_path.replace(TRANSCRIPT_STORE)
 
 
+def _seed_user_pdfs(
+    user_name: str,
+    collection_name: str,
+    user_record: dict,
+    store: dict,
+) -> None:
+    if user_record.get("seeded_pdfs"):
+        return
+    if user_record.get("sessions"):
+        return
+    if not DEFAULT_PDFS_DIR.exists():
+        print(f"[seed] pdf directory missing: {DEFAULT_PDFS_DIR}")
+        return
+    pdf_paths = sorted(DEFAULT_PDFS_DIR.glob("*.pdf"))
+    if not pdf_paths:
+        print(f"[seed] no pdfs found in: {DEFAULT_PDFS_DIR}")
+        return
+    print(f"[seed] uploading {len(pdf_paths)} pdfs for user: {user_name}")
+    total_chunks = 0
+    for pdf_path in pdf_paths:
+        result = pdf_ingest.ingest_pdf_file(pdf_path, collection_name=collection_name)
+        total_chunks += int(result.get("chunks", 0))
+    user_record["seeded_pdfs"] = {
+        "count": len(pdf_paths),
+        "chunks": total_chunks,
+        "uploaded_at": time.time(),
+    }
+    _save_store(store)
+
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
 
@@ -78,6 +110,13 @@ async def entrypoint(ctx: JobContext):
 
     store = _load_store()
     user_record = store.setdefault("users", {}).setdefault(user_name, {"sessions": []})
+    if weaviate_ready:
+        _seed_user_pdfs(
+            user_name=user_name,
+            collection_name=collection_name,
+            user_record=user_record,
+            store=store,
+        )
     previous_session = user_record["sessions"][-1] if user_record["sessions"] else None
     previous_items = previous_session.get("items", []) if previous_session else []
 
