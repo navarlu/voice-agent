@@ -181,6 +181,17 @@ p {
   font-size: 0.85rem;
 }
 
+.welcome__version {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
 .welcome__footer {
   color: var(--muted);
   font-size: 0.8rem;
