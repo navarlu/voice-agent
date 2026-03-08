@@ -212,10 +212,6 @@ def delete_document(payload: DeleteDocumentRequest):
     _verify_passcode(payload.passcode)
     user_name = payload.name.strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
-    seed_collection = weaviate_utils.seed_collection_name()
-    seed_sources = weaviate_utils.list_sources(collection_name=seed_collection)
-    if any((entry.get("source", "").split("#", 1)[0] == payload.source) for entry in seed_sources):
-        raise HTTPException(status_code=403, detail="Seed documents cannot be deleted")
     deleted = weaviate_utils.delete_source(payload.source, collection_name=collection_name)
     return {"status": "ok", "deleted": deleted}
 
@@ -225,30 +221,8 @@ def list_documents(payload: ListDocumentsRequest):
     _verify_passcode(payload.passcode)
     user_name = payload.name.strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
-    seed_collection = weaviate_utils.seed_collection_name()
     user_sources = weaviate_utils.list_sources(collection_name=collection_name)
-    seed_sources = weaviate_utils.list_sources(collection_name=seed_collection)
     items = []
-    for entry in seed_sources:
-        source = entry.get("source", "")
-        base = source.split("#", 1)[0] if source else ""
-        name = Path(base).name if base else "document.pdf"
-        size = 0
-        if base and Path(base).exists():
-            try:
-                size = Path(base).stat().st_size
-            except OSError:
-                size = 0
-        items.append(
-            {
-                "source": base,
-                "name": name,
-                "size": size,
-                "chunks": entry.get("count", 0),
-                "origin": "seed",
-                "deletable": False,
-            }
-        )
     for entry in user_sources:
         source = entry.get("source", "")
         base = source.split("#", 1)[0] if source else ""

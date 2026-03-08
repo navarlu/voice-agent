@@ -23,6 +23,7 @@ const html = htm.bind(React.createElement);
 const PROD_TOKEN_ENDPOINT = "https://livekit.virtualemployees.solutions/api/token";
 const LOCAL_TOKEN_ENDPOINT = "http://localhost:8001/token";
 const ENV_STORAGE_KEY = "lk-env";
+const APP_VERSION = "0.1.3";
 
 const CHAT_TOPIC = "lk.chat";
 
@@ -168,11 +169,8 @@ function WelcomeView({ status, onStart, activeEnv, onToggleEnv, name, passcode, 
         <button className="welcome__cta" type="submit">Start call</button>
       </form>
       <p className="welcome__status">${status}</p>
-      <p className="welcome__version">v0.1.0</p>
     </div>
-    <p className="welcome__footer">
-      
-    </p>
+    <p className="welcome__footer">Version ${APP_VERSION}</p>
   </div>`;
 }
 
@@ -209,6 +207,10 @@ function SessionMetaCard({ roomName, identity, modelName }) {
       <div className="meta-row">
         <span className="meta-label">Model</span>
         <span className="meta-value">${modelName || "-"}</span>
+      </div>
+      <div className="meta-row">
+        <span className="meta-label">Version</span>
+        <span className="meta-value">v${APP_VERSION}</span>
       </div>
     </div>
   </section>`;
