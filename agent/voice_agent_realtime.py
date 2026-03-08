@@ -35,7 +35,7 @@ from config import (
 
 load_dotenv(BASE_DIR / ".env")
 
-FALLBACK_TTS = False
+
 
 
 def _load_store() -> dict:
@@ -67,7 +67,6 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     user_name = (participant.name or "").strip() or "Guest"
     collection_name = weaviate_utils.normalize_collection_name(user_name)
-    seed_collection = weaviate_utils.seed_collection_name()
 
     weaviate_ready = weaviate_utils.wait_for_weaviate(debug=True)
     if not weaviate_ready:
@@ -103,7 +102,7 @@ async def entrypoint(ctx: JobContext):
             results = weaviate_utils.search_across_collections(
                 query=query,
                 limit=limit,
-                collection_names=[collection_name, seed_collection],
+                collection_names=[collection_name],
             )
             print(f"[search] results={len(results)}")
             return json.dumps({"results": results}, ensure_ascii=False)
@@ -133,8 +132,7 @@ async def entrypoint(ctx: JobContext):
             api_key=os.getenv("OPENAI_API_KEY"),
         ),
     }
-    if FALLBACK_TTS:
-        session_kwargs["tts"] = openai.TTS(model="gpt-4o-mini-tts", voice="Marin")
+    
     session = AgentSession(**session_kwargs)
 
     def handle_conversation_item(event) -> None:
