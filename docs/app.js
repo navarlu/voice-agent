@@ -169,8 +169,8 @@ function WelcomeView({ status, onStart, activeEnv, onToggleEnv, name, passcode, 
         <button className="welcome__cta" type="submit">Start call</button>
       </form>
       <p className="welcome__status">${status}</p>
+      <p className="welcome__footer">Version ${APP_VERSION}</p>
     </div>
-    <p className="welcome__footer">Version ${APP_VERSION}</p>
   </div>`;
 }
 
